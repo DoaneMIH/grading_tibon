@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Student Grade Report — Doane Ibarra',
-  description: 'Academic performance tracker for student grades',
+  description: 'Academic performance tracker',
 };
 
 export default function RootLayout({ children }) {

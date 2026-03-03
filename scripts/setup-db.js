@@ -1,13 +1,13 @@
 // scripts/setup-db.js
-// Run once with: npm run db:setup
-// This creates your tables and inserts all student data into Neon.
+// Run once: npm run db:setup
+// Creates tables and seeds 5 students with 5 grades each into Neon.
 
 const { neon } = require('@neondatabase/serverless');
 require('dotenv').config({ path: '.env.local' });
 
 const sql = neon(process.env.DATABASE_URL);
 
-const students = [
+const STUDENTS = [
   { name: 'Sophia Reyes',  code: 'STU-001' },
   { name: 'Liam Nakamura', code: 'STU-002' },
   { name: 'Amara Okonkwo', code: 'STU-003' },
@@ -15,7 +15,7 @@ const students = [
   { name: 'Isla Brennan',  code: 'STU-005' },
 ];
 
-const subjects = [
+const SUBJECTS = [
   { subject: 'Mathematics', icon: '📐' },
   { subject: 'English',     icon: '📖' },
   { subject: 'Science',     icon: '🔬' },
@@ -23,7 +23,7 @@ const subjects = [
   { subject: 'Programming', icon: '💻' },
 ];
 
-const scores = [
+const SCORES = [
   [94, 88, 91, 85, 97], // Sophia
   [72, 68, 74, 70, 65], // Liam
   [89, 93, 87, 90, 84], // Amara
@@ -32,39 +32,34 @@ const scores = [
 ];
 
 async function setup() {
-  console.log('🔧 Setting up database...\n');
+  console.log('🔧 Setting up Neon database...\n');
 
-  // 1. Drop existing tables (to ensure clean schema)
-  await sql`DROP TABLE IF EXISTS grades CASCADE`;
-  await sql`DROP TABLE IF EXISTS students CASCADE`;
-
-  // 2. Create students table
+  // Create students table
   await sql`
-    CREATE TABLE students (
+    CREATE TABLE IF NOT EXISTS students (
       id           SERIAL PRIMARY KEY,
-      name         TEXT    NOT NULL,
-      student_code TEXT    UNIQUE NOT NULL
+      name         TEXT   NOT NULL,
+      student_code TEXT   UNIQUE NOT NULL
     )
   `;
   console.log('✅ Table "students" ready');
 
-  // 3. Create grades table
+  // Create grades table
   await sql`
-    CREATE TABLE grades (
+    CREATE TABLE IF NOT EXISTS grades (
       id         SERIAL  PRIMARY KEY,
       student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
       subject    TEXT    NOT NULL,
-      icon       TEXT    NOT NULL,
-      score      INTEGER NOT NULL
+      icon       TEXT    NOT NULL DEFAULT '',
+      score      INTEGER NOT NULL CHECK (score >= 0 AND score <= 100)
     )
   `;
-  console.log('✅ Table "grades" ready');
+  console.log('✅ Table "grades" ready\n');
 
-  // 3. Seed students and grades
-  for (let i = 0; i < students.length; i++) {
-    const { name, code } = students[i];
+  // Seed data
+  for (let i = 0; i < STUDENTS.length; i++) {
+    const { name, code } = STUDENTS[i];
 
-    // Insert student (skip if already exists)
     const rows = await sql`
       INSERT INTO students (name, student_code)
       VALUES (${name}, ${code})
@@ -73,31 +68,27 @@ async function setup() {
     `;
 
     if (rows.length === 0) {
-      console.log(`⏭️  Skipped "${name}" (already exists)`);
+      console.log(`⏭️  Skipped "${name}" — already exists`);
       continue;
     }
 
     const studentId = rows[0].id;
 
-    // Insert grades for this student
-    for (let j = 0; j < subjects.length; j++) {
-      const { subject, icon } = subjects[j];
-      const score = scores[i][j];
-
+    for (let j = 0; j < SUBJECTS.length; j++) {
       await sql`
         INSERT INTO grades (student_id, subject, icon, score)
-        VALUES (${studentId}, ${subject}, ${icon}, ${score})
+        VALUES (${studentId}, ${SUBJECTS[j].subject}, ${SUBJECTS[j].icon}, ${SCORES[i][j]})
       `;
     }
 
-    console.log(`✅ Inserted "${name}" with ${subjects.length} grades`);
+    console.log(`✅ Added "${name}" (${code}) with ${SUBJECTS.length} grades`);
   }
 
-  console.log('\n🎉 Database setup complete! You can now run: npm run dev');
+  console.log('\n🎉 Done! Run: npm run dev');
   process.exit(0);
 }
 
-setup().catch((err) => {
-  console.error('❌ Setup failed:', err.message);
+setup().catch(err => {
+  console.error('\n❌ Setup failed:', err.message);
   process.exit(1);
 });
